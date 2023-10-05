@@ -23,6 +23,7 @@
 #include <vector>
 #include <array>
 #include <map>
+#include <math.h>
 
 
 /* Globals */
@@ -54,6 +55,9 @@ std::vector<Face_t> face;
 std::vector<FaceTable_t> face_table;
 
 bool creating_initial_pol = true;
+bool creating_point = true;
+bool color_face = false;
+bool color_vertex = false;
 
 /** Vertex shader. */
 const char *vertex_code = "\n"
@@ -94,10 +98,19 @@ void display()
         for (HalfEdgeTable_t het : half_edge_table)
         {
             std::cout << het.incident_face->key << std::endl;
-            glColor3f(het.he->orig->r, het.he->orig->g, het.he->orig->b); 
-            glVertex2f(het.he->orig->x,het.he->orig->y);
-            glColor3f(het.he->twin->orig->r, het.he->twin->orig->g, het.he->twin->orig->b); 
-            glVertex2f(het.he->twin->orig->x, het.he->twin->orig->y);
+            if(het.he->orig->r == het.he->twin->orig->r && het.he->orig->g == het.he->twin->orig->g && het.he->orig->b == het.he->twin->orig->b)
+            {
+                glColor3f(het.he->orig->r, het.he->orig->g, het.he->orig->b); 
+                glVertex2f(het.he->orig->x,het.he->orig->y);
+                glColor3f(het.he->twin->orig->r, het.he->twin->orig->g, het.he->twin->orig->b); 
+                glVertex2f(het.he->twin->orig->x, het.he->twin->orig->y);
+            }
+            else
+            {
+                glColor3f(1.0f, 1.0f, 1.0f); 
+                glVertex2f(het.he->orig->x,het.he->orig->y);
+                glVertex2f(het.he->twin->orig->x, het.he->twin->orig->y);
+            }
         }
         glEnd();
     }
@@ -357,14 +370,257 @@ void createInitialPolygon()
     creating_initial_pol = false;
 }
 
+int findFaceWithPoint(const Point_t point)
+{
+    int current = 0;
+    int initial = current;
+    while(true)
+    {
+        if(!isConvex(std::array<float, 3>({point.x, point.y, 0.0f}), std::array<float, 3>({h[current].orig->x, h[current].orig->y, 0.0f}), std::array<float, 3>({h[current].end->x, h[current].end->y, 0.0f})))
+        {
+            current = nextHalfEdge(current, adj, vertex, h);
+            continue;
+        }
+
+        if(left(std::array<float, 3>({point.x, point.y, 0.0f}), std::array<float, 3>({h[current].orig->x, h[current].orig->y, 0.0f}), std::array<float, 3>({h[current].end->x, h[current].end->y, 0.0f})))
+        {
+            
+            current = nextHalfEdge(current, adj, vertex, h);
+            if(current == initial)
+            {
+                break;
+            }
+        }
+        else
+        {
+            current = prevHalfEdge(current, adj, vertex, h);
+            current = searchHalfEdge(h[current].orig->key, h[current].twin->orig->key, h);
+            initial = current;
+        }
+    }
+    return current;
+}
+
+void connectOrbit(int k1, int k2)
+{
+    
+}
+
+void createVertex(int x, int y)
+{
+
+    Point_t point = {.x = (float)(x - win_width/2)/(win_width/2), .y = -(float)(y - win_height/2)/(win_height/2)};
+    int e = findFaceWithPoint(point);
+    int ini_e = e;
+
+    Vertex_t v_aux = {.x = point.x, .y=point.y, .r = 1.0f, .g=1.0f, .b=1.0f, .key = vertex.size()};
+    vertex.push_back(v_aux);
+
+    HalfEdge_t* he = new HalfEdge_t;
+    HalfEdge_t* twin = new HalfEdge_t;
+    adj[v_aux.key].push_back(h[e].orig->key);
+    adj[h[e].orig->key].push_back(v_aux.key);
+    createEdge(v_aux, vertex[h[e].orig->key], *he, *twin);
+    //connectOrbit(k, nextHalfEdge(e, adj, vertex, h);)
+    h.push_back(*he);
+    h.push_back(*twin);
+    unvisited_half_edge.push_back(false);
+    unvisited_half_edge.push_back(false);
+    e = nextHalfEdge(e, adj, vertex, h);
+
+    // while(e != ini_e)
+    // {
+    //     he = new HalfEdge_t;
+    //     twin = new HalfEdge_t;
+    //     adj[v_aux.key].push_back(h[e].orig->key);
+    //     adj[h[e].orig->key].push_back(v_aux.key);
+    //     createEdge(v_aux, vertex[h[e].orig->key], *he, *twin);
+    //     h.push_back(*he);
+    //     h.push_back(*twin);
+    //     unvisited_half_edge.push_back(false);
+    //     unvisited_half_edge.push_back(false);
+    //     e = nextHalfEdge(e, adj, vertex, h);
+    //     std::cout << "LOOP " << e << e << ini_e << std::endl;
+    // }
+    fillHalfEdgeTable(half_edge_table, h, unvisited_half_edge, vertex, adj, face, face_table);
+}
+
+
+int selected_face = -1;
+int edge_from_face = -1;
+
+void unselectFace()
+{
+    int v = selected_face;
+    h[v].orig->r = 1.0f;
+    h[v].orig->g = 1.0f;
+    h[v].orig->b = 1.0f;
+    v = nextHalfEdge(v, adj, vertex, h);
+    std::cout << "Face selected" << std::endl;
+    while(v != selected_face)
+    {
+        h[v].orig->r = 1.0f;
+        h[v].orig->g = 1.0f;
+        h[v].orig->b = 1.0f;
+        v = nextHalfEdge(v, adj, vertex, h);
+    }
+    selected_face = -1;
+    edge_from_face = -1;
+}
+
+void selectFace(int x, int y)
+{
+    if(selected_face != -1)
+    {
+        unselectFace();
+    }
+    Point_t point = {.x =(float)(x - win_width/2)/(win_width/2), .y=-(float)(y - win_height/2)/(win_height/2)};
+    int v = findFaceWithPoint(point);
+    selected_face = v;
+    edge_from_face = v;
+    h[v].orig->r = 0.5f;
+    h[v].orig->g = 0.5f;
+    h[v].orig->b = 0.5f;
+    v = nextHalfEdge(v, adj, vertex, h);
+    std::cout << "Face selected" << std::endl;
+    while(v != selected_face)
+    {
+        h[v].orig->r = 0.5f;
+        h[v].orig->g = 0.5f;
+        h[v].orig->b = 0.5f;
+        v = nextHalfEdge(v, adj, vertex, h);
+    }
+}
+
+void colorEdgefromFace()
+{
+    if(edge_from_face == -1)
+        return;
+    h[edge_from_face].orig->r = 1.0f;
+    h[edge_from_face].orig->g = 0.0f;
+    h[edge_from_face].orig->b = 0.0f;
+    edge_from_face = nextHalfEdge(edge_from_face, adj, vertex, h);
+}
+
+float dist(float x1, float y1, float x2, float y2)
+{
+    return sqrt(pow(x1 - x2, 2.0f) + pow(y1 - y2, 2.0f));
+}
+
+int findCloseVertex(Point_t point)
+{
+    float min_dist = 100000;
+    int key_min = -1;
+    for(Vertex_t& v : vertex)
+    {
+        float d = dist(point.x, point.y, v.x, v.y);
+        if(d < min_dist)
+        {
+            min_dist = d;
+            key_min = v.key;
+        }
+    }
+    return key_min;
+}
+
+int selected_vert = -1;
+int edge_from_vert = -1;
+
+void unselectVertex()
+{
+    for(int i = 0; i < adj[selected_vert].size(); i++)
+    {
+        int edge = searchHalfEdge(vertex[selected_vert].key, adj[selected_vert][i], h);
+        h[edge].orig->r = 1.0f;
+        h[edge].orig->g = 1.0f;
+        h[edge].orig->b = 1.0f;
+        h[edge].end->r = 1.0f;
+        h[edge].end->g = 1.0f;
+        h[edge].end->b = 1.0f;
+    }
+    selected_vert = -1;
+    edge_from_vert = -1;
+}
+
+void selectCloseVertex(int x, int y)
+{
+    if(selected_vert != -1)
+    {
+        unselectVertex();
+    }
+    Point_t point = {.x =(float)(x - win_width/2)/(win_width/2), .y=-(float)(y - win_height/2)/(win_height/2)};
+    int v = findCloseVertex(point);
+    selected_vert = v;
+    edge_from_vert = 0;
+    std::cout << "Face selected" << std::endl;
+    for(int i = 0; i < adj[v].size(); i++)
+    {
+        int edge = searchHalfEdge(vertex[v].key, adj[v][i], h);
+        h[edge].orig->r = 0.5f;
+        h[edge].orig->g = 0.5f;
+        h[edge].orig->b = 0.5f;
+        h[edge].end->r = 0.5f;
+        h[edge].end->g = 0.5f;
+        h[edge].end->b = 0.5f;
+    }
+}
+
+void colorEdgefromVertex()
+{
+    if(edge_from_vert == -1)
+        return;
+    int edge = searchHalfEdge(vertex[selected_vert].key, adj[selected_vert][edge_from_vert], h);
+    h[edge].orig->r = 0.0f;
+    h[edge].orig->g = 0.0f;
+    h[edge].orig->b = 1.0f;
+    h[edge].end->r = 0.0f;
+    h[edge].end->g = 0.0f;
+    h[edge].end->b = 1.0f;
+    edge_from_vert++;
+    if(edge_from_vert >= adj[selected_vert].size())
+    {
+        edge_from_vert = 0;
+    }
+}
+
 void mouse(int button, int state, int x, int y)
 {
     if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN )
     {
-        createPoint(x,y);
+        if(creating_point)
+        {
+            if(creating_initial_pol)
+                createPoint(x,y);
+            else 
+                createVertex(x, y);
+        }
+        else if (color_face)
+        {
+            std::cout << "selecting face" << std::endl;
+            selectFace(x, y);
+        }
+        else if (color_vertex)
+        {
+            selectCloseVertex(x, y);
+        }
         //findAreaAndOrientation();
         //verifyAngle();
         //earVerify();
+    }
+    else if(button == GLUT_RIGHT_BUTTON && state == GLUT_DOWN )
+    {
+        if(creating_point)
+        {
+        }
+        else if (color_face)
+        {
+            std::cout << "selecting edges of face" << std::endl;
+            colorEdgefromFace();
+        }
+        else if (color_vertex)
+        {
+            colorEdgefromVertex();
+        }
     }
     glutPostRedisplay();
 }
@@ -387,12 +643,67 @@ void keyboard(unsigned char key, int x, int y)
                 case 'd':
                     points.clear();
                     break;
+                case 'p':
+                {
+                    color_face = false;
+                    color_vertex = false;
+                    creating_point = true;
+                    break;
+                }   
+                case 'f':
+                {
+                    if(color_face == false){
+                        color_face = true;
+                        color_vertex = false;
+                        creating_point = false;
+                        if(selected_vert != -1)
+                        {
+                            unselectVertex();
+                        }
+                    }
+                    else
+                    {
+                        color_face = false;
+                        color_vertex = false;
+                        creating_point = false;
+                        if(selected_face != -1)
+                        {
+                            unselectFace();
+                        }
+                    }
+                    break;
+                }
+                case 'v':
+                {
+                    if(color_vertex == false){
+                        color_face = false;
+                        color_vertex = true;
+                        creating_point = false;
+                        if(selected_face != -1)
+                        {
+                            unselectFace();
+                        }
+                    }
+                    else
+                    {
+                        color_face = false;
+                        color_vertex = false;
+                        creating_point = false;
+                        if(selected_vert != -1)
+                        {
+                            unselectVertex();
+                        }
+                    }
+                    break;
+                }   
                 case 'c':
                 {
-                    createInitialPolygon();
-                    fillVertexTable(ver_tab, h, vertex, adj);
-                    fillHalfEdgeTable(half_edge_table, h, unvisited_half_edge, vertex, adj, face, face_table);
-                    fillFaceTableInnerComponents(face_table, h, half_edge_table, face, vertex);
+                    if(creating_initial_pol){
+                        createInitialPolygon();
+                        fillVertexTable(ver_tab, h, vertex, adj);
+                        fillHalfEdgeTable(half_edge_table, h, unvisited_half_edge, vertex, adj, face, face_table);
+                        fillFaceTableInnerComponents(face_table, h, half_edge_table, face, vertex);
+                    }
                     break;
                 }
                 case 'q':

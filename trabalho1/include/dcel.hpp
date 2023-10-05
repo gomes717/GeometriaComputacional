@@ -67,6 +67,9 @@ float angle(Vertex_t v1, Vertex_t v2, Vertex_t v3);
 int nextHalfEdge(int current, std::map<int, std::vector<int>>& adj,
                    std::vector<Vertex_t>& vertex, std::vector<HalfEdge_t> &half_edge);
 
+int prevHalfEdge(int current, std::map<int, std::vector<int>>& adj,
+                   std::vector<Vertex_t>& vertex, std::vector<HalfEdge_t> &half_edge);
+
 void fillHalfEdgeTable(std::vector<HalfEdgeTable_t> &half_edge_table,
                           std::vector<HalfEdge_t> &half_edge,
                           std::vector<bool> &unvisited_half_edge,
