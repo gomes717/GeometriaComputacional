@@ -522,6 +522,19 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
     int ints_visited = 0;
     std::vector<std::array<float,6>> int_polygon = {};
     int enter_point = -1;
+    if(intersection_points.size() == 0 && inside)
+    {
+        for(std::array<float,6> v : p2)
+        {
+           int_polygon.push_back(v);
+           int_polygon[int_polygon.size() - 1][3] = 0.0f; 
+           int_polygon[int_polygon.size() - 1][4] = 0.5f; 
+           int_polygon[int_polygon.size() - 1][5] = 0.5f; 
+        }
+        int_polygons.push_back(int_polygon);
+        return;
+    }
+    
     while(ints_visited < intersection_points.size())
     {
         if(ints[1][j].second == INT && inside)
