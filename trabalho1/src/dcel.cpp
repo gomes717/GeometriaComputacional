@@ -80,6 +80,28 @@ int nextHalfEdge(int current, std::map<int, std::vector<int>>& adj,
 	return searchHalfEdge(e, next_vertex, half_edge);
 }
 
+int prevHalfEdge(int current, std::map<int, std::vector<int>>& adj,
+				   std::vector<Vertex_t>& vertex, std::vector<HalfEdge_t> &half_edge) {
+	int s, e;
+	float max_angle = 0, temp_angle;
+	int next_vertex;
+	s = half_edge[current].orig->key;
+	e = half_edge[current].end->key;
+	next_vertex = e;
+	for (auto k : adj[s]) {
+		if (k == s)
+		continue;
+		else {
+		temp_angle = angle(vertex[s], vertex[e], vertex[k]);
+		if (max_angle < temp_angle) {
+			max_angle = temp_angle;
+			next_vertex = k;
+		}
+		}
+	}
+	return searchHalfEdge(s, next_vertex, half_edge);
+}
+
 void fillHalfEdgeTable(std::vector<HalfEdgeTable_t> &half_edge_table,
 							std::vector<HalfEdge_t> &half_edge,
 							std::vector<bool> &unvisited_half_edge,
