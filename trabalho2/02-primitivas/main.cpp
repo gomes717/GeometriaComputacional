@@ -366,7 +366,9 @@ std::pair<std::array<float,6>, PointInfo> classifyPoint(std::array<float,6>& int
 
 float pointDst(std::array<float,6> p1, std::array<float,6> p2)
 {
-    return sqrt(pow((p1[0] - p2[0]),2) - pow((p1[1] - p2[1]),2));
+    float out = sqrt(pow((p1[0] - p2[0]),2) + pow((p1[1] - p2[1]),2));
+    std::cout << "dist " << out << std::endl;
+    return out;
 }
 
 bool compareDists(std::pair<int, float> p1, std::pair<int, float> p2)
@@ -474,7 +476,7 @@ std::array<std::vector<std::pair<int, PointInfo>>, 2> intersectionBetweenPolys(c
         for(int j = 0; j < dists.size(); j++)
         {
             point = {inter_map1[i][dists[j].first], INT};
-            std::cout << " " << inter_map1[i][dists[j].first] << std::endl;
+            std::cout << " " << inter_map1[i][dists[j].first] << " " << dists[j].second<< std::endl;
             intersections[0].push_back(point);
         }
     }
@@ -493,13 +495,24 @@ std::array<std::vector<std::pair<int, PointInfo>>, 2> intersectionBetweenPolys(c
         for(int j = 0; j < dists.size(); j++)
         {
             point = {inter_map2[i][dists[j].first], INT};
-            std::cout << " " << inter_map2[i][dists[j].first] << std::endl;
+            std::cout << " " << inter_map2[i][dists[j].first] << " " << dists[j].second<< std::endl;
             intersections[1].push_back(point);
         }
     }
 
     std::cout << "Intersections found"  << std::endl;
     return intersections;
+}
+
+void negate(std::vector<std::array<float,6>>& poly)
+{
+    std::reverse(poly.begin(),poly.end());
+    for(std::array<float,6>& v : poly)
+    {
+        v[3] = 1 - v[3];
+        v[4] = 1 - v[4];
+        v[5] = 1 - v[5];
+    }
 }
 
 void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool inside, const std::vector<std::array<float,6>>& p1, const std::vector<std::array<float,6>>& p2)
@@ -521,46 +534,49 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
             std::cout << "ENTER"  << std::endl;
             inside = true;
             std::cout << "Starting intersection polygon"  << std::endl;
-            intersection_points[ints[1][j].first][3] = 1;
-            intersection_points[ints[1][j].first][4] = 1;
-            intersection_points[ints[1][j].first][5] = 1;
-            int_polygon.push_back(intersection_points[ints[1][j].first]);
+
             if(enter_point == -1)
                 enter_point = ints[1][j].first;
             ints_visited++;
-            j = (j + 1)%ints[1].size();
-            while(ints[1][j].second != INT)
+            while((ints[0][i].first != enter_point && ints[0][i].second != INT) || !(ints[0][i].first == enter_point && ints[0][i].second == INT))
             {
-                int_polygon.push_back(p2[ints[1][j].first]);
+                intersection_points[ints[1][j].first][3] = 1;
+                intersection_points[ints[1][j].first][4] = 1;
+                intersection_points[ints[1][j].first][5] = 1;
+                int_polygon.push_back(intersection_points[ints[1][j].first]);
                 j = (j + 1)%ints[1].size();
-            }
+                while(ints[1][j].second != INT)
+                {
+                    int_polygon.push_back(p2[ints[1][j].first]);
+                    j = (j + 1)%ints[1].size();
+                }
 
-            while((ints[1][j].first != ints[0][i].first && ints[0][i].second != INT) || !(ints[1][j].first == ints[0][i].first && ints[0][i].second == INT)) i++;
-            intersection_points[ints[1][j].first][3] = 0;
-            intersection_points[ints[1][j].first][4] = 0;
-            intersection_points[ints[1][j].first][5] = 0;
-            int_polygon.push_back(intersection_points[ints[0][i].first]);
-            i = (i + 1)%ints[0].size();
-            ints_visited++;
-            //(ints[1][j].first != enter_point && ints[1][j].second != INT) || !(ints[1][j].first == enter_point && ints[1][j].second == INT)
-            while(ints[0][i].second != INT)
-            {
-                int_polygon.push_back(p1[ints[0][i].first]);
+                while((ints[1][j].first != ints[0][i].first && ints[0][i].second != INT) || !(ints[1][j].first == ints[0][i].first && ints[0][i].second == INT)) i = (i + 1)%ints[0].size();
+                intersection_points[ints[1][j].first][3] = 0;
+                intersection_points[ints[1][j].first][4] = 0;
+                intersection_points[ints[1][j].first][5] = 0;
+                int_polygon.push_back(intersection_points[ints[0][i].first]);
                 i = (i + 1)%ints[0].size();
-            }
-            intersection_points[ints[0][i].first][3] = 0.5;
-            intersection_points[ints[0][i].first][4] = 0.5;
-            intersection_points[ints[0][i].first][5] = 0.5;
-            int_polygon.push_back(intersection_points[ints[0][i].first]);
-            // int_polygons.push_back(int_polygon);
-            // int_polygon.clear();
-            if(ints[0][i].first == enter_point)
-            {
                 ints_visited++;
-                int_polygons.push_back(int_polygon);
-                int_polygon.clear();
-                enter_point = -1;
+                //(ints[1][j].first != enter_point && ints[1][j].second != INT) || !(ints[1][j].first == enter_point && ints[1][j].second == INT)
+                while(ints[0][i].second != INT)
+                {
+                    int_polygon.push_back(p1[ints[0][i].first]);
+                    i = (i + 1)%ints[0].size();
+                }
+                intersection_points[ints[0][i].first][3] = 0.5;
+                intersection_points[ints[0][i].first][4] = 0.5;
+                intersection_points[ints[0][i].first][5] = 0.5;
+                int_polygon.push_back(intersection_points[ints[0][i].first]);
+                // int_polygons.push_back(int_polygon);
+                // int_polygon.clear();
+                //ints_visited++;
+                while((ints[1][j].first != ints[0][i].first && ints[1][j].second != INT) || !(ints[1][j].first == ints[0][i].first && ints[1][j].second == INT)) j = (j + 1)%ints[1].size();
+                ints_visited++;
             }
+            int_polygons.push_back(int_polygon);
+            int_polygon.clear();
+            enter_point = -1;
             inside = false;
         }
         i=0;
@@ -613,11 +629,36 @@ void keyboard(unsigned char key, int x, int y)
                 case 'i':
                 {
                     std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon1, polygon2);
-                    bool start_inside = pointInside(polygon1[0], polygon2);
+                    bool start_inside = pointInside(polygon2[0], polygon1);
                     if (start_inside){
                         std::cout << "start inside" << std::endl;
                     }
                     waClipping(ints, start_inside, polygon1, polygon2);
+                    break;
+                }
+                case 'n':
+                    negate(polygon1);
+                    break;
+                case 'N':
+                    negate(polygon2);
+                    break;
+                case 'c':
+                    int_polygons.clear();
+                    break;
+                case 'e':
+                {
+                    negate(polygon1);
+                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon1, polygon2);
+                    bool start_inside = pointInside(polygon2[0], polygon1);
+                    waClipping(ints, start_inside, polygon1, polygon2);
+                    break;
+                }
+                case 'E':
+                {
+                    negate(polygon2);
+                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon2, polygon1);
+                    bool start_inside = pointInside(polygon1[0], polygon2);
+                    waClipping(ints, start_inside, polygon2, polygon1);
                     break;
                 }
                 case 'q':
