@@ -752,9 +752,9 @@ void keyboard(unsigned char key, int x, int y)
                             if(polygons[i].size() == 0)
                                 continue;
                             std::cout << "Entering polygon " << i << " with intersection " << j << std::endl;
-                            ints = intersectionBetweenPolys(int_polygons[j], polygons[i]);
-                            start_inside = pointInside(polygons[i][0], int_polygons[j]);
-                            waClipping(ints, start_inside, int_polygons[j], polygons[i]);
+                            ints = intersectionBetweenPolys(polygons[i], int_polygons[j]);
+                            start_inside = pointInside(int_polygons[j][0], polygons[i]);
+                            waClipping(ints, start_inside, polygons[i], int_polygons[j]);
                             intersection_points.clear();
                         }
                         int_polygons.erase(int_polygons.begin(), int_polygons.begin() + num_ints);
