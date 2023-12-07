@@ -10,6 +10,7 @@
 #include <queue>
 #include <algorithm>
 #include <tgmath.h> 
+#include <set>
 
 /* Globals */
 /** Window width. */
@@ -39,13 +40,16 @@ std::vector<std::array<float,6>> polygon1 = {};
 std::vector<std::array<float,3>> p1_color = {};
 
 std::vector<std::array<float,6>> polygon2 = {};
-std::vector<std::array<float,3>> p2_color = {};
+
+std::vector<std::array<float,3>> poly_color = {{(float)std::rand()/RAND_MAX,(float)std::rand()/RAND_MAX,(float)std::rand()/RAND_MAX}};
+std::vector<std::vector<std::array<float,6>>> polygons = {{}};
 
 std::vector<std::array<float,6>> intersection_points = {};
 
 std::vector<std::vector<std::array<float,6>>> int_polygons = {};
 
- 
+unsigned int actual_poly = 0;
+
 int8_t orientation = 0;
 
 /** Vertex shader. */
@@ -94,10 +98,12 @@ void display()
     	glUseProgram(program);
     	glBindVertexArray(VAO);
         glPointSize(1);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(*(polygon1.data()))*polygon1.size()*6, polygon1.data(), GL_DYNAMIC_DRAW);
-    	glDrawArrays(type_primitive, 0, polygon1.size());
-        glBufferData(GL_ARRAY_BUFFER, sizeof(*(polygon2.data()))*polygon2.size()*6, polygon2.data(), GL_DYNAMIC_DRAW);
-        glDrawArrays(type_primitive, 0, polygon2.size());
+        for(int i = 0; i < polygons.size(); i++)
+        {   
+            glBufferData(GL_ARRAY_BUFFER, sizeof(*(polygons[i].data()))*polygons[i].size()*6, polygons[i].data(), GL_DYNAMIC_DRAW);
+    	    glDrawArrays(type_primitive, 0, polygons[i].size());
+        }
+
         for(std::vector<std::array<float,6>> int_poly : int_polygons)
         {
             glBufferData(GL_ARRAY_BUFFER, sizeof(*(int_poly.data()))*int_poly.size()*6, int_poly.data(), GL_DYNAMIC_DRAW);
@@ -517,11 +523,12 @@ void negate(std::vector<std::array<float,6>>& poly)
 
 void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool inside, const std::vector<std::array<float,6>>& p1, const std::vector<std::array<float,6>>& p2)
 {
-    int_polygons.clear();
+    //int_polygons.clear();
     int i = 0, j = 0;
     int ints_visited = 0;
     std::vector<std::array<float,6>> int_polygon = {};
     int enter_point = -1;
+    std::set<int> visited_ints = {};
     if(intersection_points.size() == 0 && inside)
     {
         for(std::array<float,6> v : p2)
@@ -535,7 +542,7 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
         return;
     }
 
-    while(ints_visited < intersection_points.size())
+    while(visited_ints.size() < intersection_points.size())
     {
         if(ints[1][j].second == INT && inside)
         {
@@ -550,7 +557,7 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
 
             if(enter_point == -1)
                 enter_point = ints[1][j].first;
-            ints_visited++;
+            visited_ints.insert(ints[1][j].first);
             while((ints[0][i].first != enter_point && ints[0][i].second != INT) || !(ints[0][i].first == enter_point && ints[0][i].second == INT))
             {
                 intersection_points[ints[1][j].first][3] = 1;
@@ -569,9 +576,9 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
                 intersection_points[ints[1][j].first][4] = 0;
                 intersection_points[ints[1][j].first][5] = 0;
                 int_polygon.push_back(intersection_points[ints[0][i].first]);
+                visited_ints.insert(ints[0][i].first);
                 i = (i + 1)%ints[0].size();
-                ints_visited++;
-                //(ints[1][j].first != enter_point && ints[1][j].second != INT) || !(ints[1][j].first == enter_point && ints[1][j].second == INT)
+                
                 while(ints[0][i].second != INT)
                 {
                     int_polygon.push_back(p1[ints[0][i].first]);
@@ -581,11 +588,8 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
                 intersection_points[ints[0][i].first][4] = 0.5;
                 intersection_points[ints[0][i].first][5] = 0.5;
                 int_polygon.push_back(intersection_points[ints[0][i].first]);
-                // int_polygons.push_back(int_polygon);
-                // int_polygon.clear();
-                //ints_visited++;
                 while((ints[1][j].first != ints[0][i].first && ints[1][j].second != INT) || !(ints[1][j].first == ints[0][i].first && ints[1][j].second == INT)) j = (j + 1)%ints[1].size();
-                ints_visited++;
+                visited_ints.insert(ints[0][i].first);
             }
             int_polygons.push_back(int_polygon);
             int_polygon.clear();
@@ -594,14 +598,102 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
         i=0;
         j = (j + 1)%ints[1].size();
     }
+    std::set<int>::iterator it;
     std::cout << "polygons created"  << std::endl;
+    for (it=visited_ints.begin(); it!=visited_ints.end(); ++it)
+        std::cout << ' ' << *it;
+    std::cout << '\n';
+}
+
+void waUnion(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool inside, const std::vector<std::array<float,6>>& p1, const std::vector<std::array<float,6>>& p2)
+{
+    //int_polygons.clear();
+    int i = 0, j = 0;
+    int ints_visited = 0;
+    std::vector<std::array<float,6>> int_polygon = {};
+    int enter_point = -1;
+    std::set<int> visited_ints = {};
+    if(intersection_points.size() == 0 && !inside)
+    {
+        for(std::array<float,6> v : p2)
+        {
+           int_polygon.push_back(v);
+           int_polygon[int_polygon.size() - 1][3] = 0.0f; 
+           int_polygon[int_polygon.size() - 1][4] = 0.5f; 
+           int_polygon[int_polygon.size() - 1][5] = 0.5f; 
+        }
+        int_polygons.push_back(int_polygon);
+        return;
+    }
+
+    while(visited_ints.size() < intersection_points.size())
+    {
+        if(ints[1][j].second == INT && !inside)
+        {
+            inside = true;
+            std::cout << "EXIT"  << std::endl;
+        }
+        else if(ints[1][j].second == INT && inside)
+        {
+            std::cout << "ENTER"  << std::endl;
+            inside = false;
+            std::cout << "Starting intersection polygon"  << std::endl;
+
+            if(enter_point == -1)
+                enter_point = ints[1][j].first;
+            visited_ints.insert(ints[1][j].first);
+            while((ints[0][i].first != enter_point && ints[0][i].second != INT) || !(ints[0][i].first == enter_point && ints[0][i].second == INT))
+            {
+                intersection_points[ints[1][j].first][3] = 1;
+                intersection_points[ints[1][j].first][4] = 1;
+                intersection_points[ints[1][j].first][5] = 1;
+                int_polygon.push_back(intersection_points[ints[1][j].first]);
+                j = (j + 1)%ints[1].size();
+                while(ints[1][j].second != INT)
+                {
+                    int_polygon.push_back(p2[ints[1][j].first]);
+                    j = (j + 1)%ints[1].size();
+                }
+
+                while((ints[1][j].first != ints[0][i].first && ints[0][i].second != INT) || !(ints[1][j].first == ints[0][i].first && ints[0][i].second == INT)) i = (i + 1)%ints[0].size();
+                intersection_points[ints[1][j].first][3] = 0;
+                intersection_points[ints[1][j].first][4] = 0;
+                intersection_points[ints[1][j].first][5] = 0;
+                int_polygon.push_back(intersection_points[ints[0][i].first]);
+                visited_ints.insert(ints[0][i].first);
+                i = (i + 1)%ints[0].size();
+                
+                while(ints[0][i].second != INT)
+                {
+                    int_polygon.push_back(p1[ints[0][i].first]);
+                    i = (i + 1)%ints[0].size();
+                }
+                intersection_points[ints[0][i].first][3] = 0.5;
+                intersection_points[ints[0][i].first][4] = 0.5;
+                intersection_points[ints[0][i].first][5] = 0.5;
+                int_polygon.push_back(intersection_points[ints[0][i].first]);
+                while((ints[1][j].first != ints[0][i].first && ints[1][j].second != INT) || !(ints[1][j].first == ints[0][i].first && ints[1][j].second == INT)) j = (j + 1)%ints[1].size();
+                visited_ints.insert(ints[0][i].first);
+            }
+            int_polygons.push_back(int_polygon);
+            int_polygon.clear();
+            enter_point = -1;
+        }
+        i=0;
+        j = (j + 1)%ints[1].size();
+    }
+    std::set<int>::iterator it;
+    std::cout << "polygons created"  << std::endl;
+    for (it=visited_ints.begin(); it!=visited_ints.end(); ++it)
+        std::cout << ' ' << *it;
+    std::cout << '\n';
 }
 
 void mouse(int button, int state, int x, int y)
 {
     if(button == GLUT_LEFT_BUTTON && state == GLUT_DOWN )
     {
-        createPoint(x,y, polygon1, {1.0, 0, 0});
+        createPoint(x,y, polygons[actual_poly], poly_color[actual_poly]);
         //findAreaAndOrientation();
         //verifyAngle();
         //earVerify();
@@ -631,58 +723,112 @@ void keyboard(unsigned char key, int x, int y)
                     glutLeaveMainLoop();
                     break;
                 case 'd':
-                    polygon1.clear();
-                    intersection_points.clear();
+                    for(int i = 0; i < polygons.size(); i++)
+                        polygons[i].clear();
+                    polygons.clear();
+                    polygons.push_back({});
+                    actual_poly = 0;
                     break;
                 case 'D':
-                    polygon2.clear();
-                    intersection_points.clear();
+                    polygons[actual_poly].clear();
                     break;
                 case 'i':
                 {
-                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon1, polygon2);
-                    bool start_inside = pointInside(polygon2[0], polygon1);
-                    if (start_inside){
-                        std::cout << "start inside" << std::endl;
+                    if(polygons.size() < 2)
+                        break;
+                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygons[0], polygons[1]);
+                    bool start_inside = pointInside(polygons[1][0], polygons[0]);
+                    waClipping(ints, start_inside, polygons[0], polygons[1]);
+                    intersection_points.clear();
+                    if(polygons.size() < 3)
+                        break;
+                    
+
+                    for(int i = 2; i < polygons.size(); i++)
+                    {
+                        int num_ints = int_polygons.size();
+                        for(int j = 0; j < num_ints; j++)
+                        {
+                            if(polygons[i].size() == 0)
+                                continue;
+                            std::cout << "Entering polygon " << i << " with intersection " << j << std::endl;
+                            ints = intersectionBetweenPolys(int_polygons[j], polygons[i]);
+                            start_inside = pointInside(polygons[i][0], int_polygons[j]);
+                            waClipping(ints, start_inside, int_polygons[j], polygons[i]);
+                            intersection_points.clear();
+                        }
+                        int_polygons.erase(int_polygons.begin(), int_polygons.begin() + num_ints);
                     }
-                    waClipping(ints, start_inside, polygon1, polygon2);
+                    
                     break;
                 }
                 case 'n':
-                    negate(polygon1);
-                    break;
-                case 'N':
-                    negate(polygon2);
+                    negate(polygons[actual_poly]);
                     break;
                 case 'c':
                     int_polygons.clear();
+                    intersection_points.clear();
                     break;
                 case 'e':
                 {
-                    negate(polygon1);
-                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon1, polygon2);
-                    bool start_inside = pointInside(polygon2[0], polygon1);
-                    waClipping(ints, start_inside, polygon1, polygon2);
+                    if(polygons.size() < 2 || polygons.size() >= 3)
+                        break;
+                    negate(polygons[0]);
+                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygons[0], polygons[1]);
+                    bool start_inside = pointInside(polygons[1][0], polygons[0]);
+                    waClipping(ints, start_inside, polygons[0], polygons[1]);
                     break;
                 }
                 case 'E':
                 {
-                    negate(polygon2);
-                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon2, polygon1);
-                    bool start_inside = pointInside(polygon1[0], polygon2);
-                    waClipping(ints, start_inside, polygon2, polygon1);
+                    if(polygons.size() < 2 || polygons.size() >= 3)
+                        break;
+                    negate(polygons[1]);
+                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygons[1], polygons[0]);
+                    bool start_inside = pointInside(polygons[0][0], polygons[1]);
+                    waClipping(ints, start_inside, polygons[1], polygons[0]);
                     break;
                 }
-                // case 'u':
-                // {
-                //     std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon1, polygon2);
-                //     bool start_inside = pointInside(polygon2[0], polygon1);
-                //     waClipping(ints, start_inside, polygon1, polygon2);
-                //     ints = intersectionBetweenPolys(int_polygons, polygon2);
-                //     start_inside = pointInside(int_polygons[0], polygon1);
-                //     waClipping(ints, start_inside, polygon1, int_polygons);
-                //     break;
-                // }
+                case 'u':
+                {
+                    if(polygons.size() < 2)
+                        break;
+                    std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygons[1], polygons[0]);
+                    bool start_inside = pointInside(polygons[0][0], polygons[1]);
+                    waUnion(ints, start_inside, polygons[1], polygons[0]);
+                    intersection_points.clear();
+                    if(polygons.size() < 3)
+                        break;
+                    int num_ints = int_polygons.size();
+
+                    for(int i = 2; i < polygons.size(); i++)
+                    {
+                        if(polygons[i].size() == 0)
+                            continue;
+                        std::cout << "Entering polygon for union" << i << std::endl;
+                        ints = intersectionBetweenPolys(polygons[i], int_polygons[0]);
+                        start_inside = pointInside(int_polygons[0][0], polygons[i]);
+                        waUnion(ints, start_inside, polygons[i], int_polygons[0]);
+                        intersection_points.clear();
+                        int_polygons.erase(int_polygons.begin(), int_polygons.begin() + 1);
+                    }
+                    
+
+                    break;
+                }
+                case 'a':
+                    if(actual_poly == 0)
+                        actual_poly = 0;
+                    else
+                        actual_poly--;
+                    break;
+                case 'b':
+                    actual_poly ++;
+                    if(actual_poly == polygons.size()){
+                        polygons.push_back({});
+                        poly_color.push_back({(float)std::rand()/RAND_MAX,(float)std::rand()/RAND_MAX,(float)std::rand()/RAND_MAX});
+                    }
+                    break;
                 case 'q':
                 case 'Q':
                         glutLeaveMainLoop();
