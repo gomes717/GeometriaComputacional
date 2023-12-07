@@ -534,7 +534,7 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
         int_polygons.push_back(int_polygon);
         return;
     }
-    
+
     while(ints_visited < intersection_points.size())
     {
         if(ints[1][j].second == INT && inside)
@@ -590,7 +590,6 @@ void waClipping(std::array<std::vector<std::pair<int, PointInfo>>, 2> ints, bool
             int_polygons.push_back(int_polygon);
             int_polygon.clear();
             enter_point = -1;
-            inside = false;
         }
         i=0;
         j = (j + 1)%ints[1].size();
@@ -674,6 +673,16 @@ void keyboard(unsigned char key, int x, int y)
                     waClipping(ints, start_inside, polygon2, polygon1);
                     break;
                 }
+                // case 'u':
+                // {
+                //     std::array<std::vector<std::pair<int, PointInfo>>, 2> ints = intersectionBetweenPolys(polygon1, polygon2);
+                //     bool start_inside = pointInside(polygon2[0], polygon1);
+                //     waClipping(ints, start_inside, polygon1, polygon2);
+                //     ints = intersectionBetweenPolys(int_polygons, polygon2);
+                //     start_inside = pointInside(int_polygons[0], polygon1);
+                //     waClipping(ints, start_inside, polygon1, int_polygons);
+                //     break;
+                // }
                 case 'q':
                 case 'Q':
                         glutLeaveMainLoop();
