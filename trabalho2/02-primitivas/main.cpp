@@ -812,8 +812,6 @@ void keyboard(unsigned char key, int x, int y)
                         intersection_points.clear();
                         int_polygons.erase(int_polygons.begin(), int_polygons.begin() + 1);
                     }
-                    
-
                     break;
                 }
                 case 'a':
